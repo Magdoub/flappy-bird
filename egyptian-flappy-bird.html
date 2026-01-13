@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Horus - Egyptian Flappy Bird</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a0a00 0%, #3d2314 100%);
+            font-family: 'Papyrus', 'Copperplate', fantasy;
+            overflow: hidden;
+        }
+
+        .game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        h1 {
+            color: #ffd700;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 20px #ff8c00;
+            font-size: 2.5rem;
+            letter-spacing: 3px;
+        }
+
+        #gameCanvas {
+            border: 8px solid #c9a227;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(201, 162, 39, 0.5), inset 0 0 50px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+
+        .score-display {
+            display: flex;
+            gap: 40px;
+            color: #ffd700;
+            font-size: 1.3rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .instructions {
+            color: #d4af37;
+            font-size: 1rem;
+            text-align: center;
+            opacity: 0.9;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .sound-toggle {
+            background: linear-gradient(145deg, #c9a227, #8b6914);
+            border: 2px solid #ffd700;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .sound-toggle:hover {
+            background: linear-gradient(145deg, #ffd700, #c9a227);
+            transform: scale(1.05);
+        }
+
+        .hieroglyph-border {
+            position: absolute;
+            font-size: 2rem;
+            color: #8b6914;
+            opacity: 0.3;
+        }
+
+        .hieroglyph-border.left { left: -50px; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; }
+        .hieroglyph-border.right { right: -50px; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>𓅃 FLAPPY HORUS 𓅃</h1>
+        <div class="score-display">
+            <span>Score: <span id="score">0</span></span>
+            <span>Best: <span id="bestScore">0</span></span>
+        </div>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="controls">
+            <p class="instructions">Click or Press SPACE to flap your wings!</p>
+            <button class="sound-toggle" id="soundToggle">🔊 Sound: ON</button>
+        </div>
+        <div class="hieroglyph-border left">𓀀𓁀𓂀𓃀𓄀𓅀𓆀𓇀𓈀𓉀</div>
+        <div class="hieroglyph-border right">𓊀𓋀𓌀𓍀𓎀𓏀𓐀𓑀𓒀𓓀</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const bestScoreDisplay = document.getElementById('bestScore');
+        const soundToggle = document.getElementById('soundToggle');
+
+        // Audio Context for sound generation
+        let audioContext = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Sound effect functions using Web Audio API
+        function playFlapSound() {
+            if (!soundEnabled || !audioContext) return;
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1);
+            oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.15);
+
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.15);
+        }
+
+        function playScoreSound() {
+            if (!soundEnabled || !audioContext) return;
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            // Magical Egyptian chime
+            oscillator.frequency.setValueAtTime(523, audioContext.currentTime); // C5
+            oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.1); // E5
+            oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.2); // G5
+
+            oscillator.type = 'triangle';
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.4);
+
+            // Add a second harmonic
+            const osc2 = audioContext.createOscillator();
+            const gain2 = audioContext.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioContext.destination);
+
+            osc2.frequency.setValueAtTime(1046, audioContext.currentTime + 0.15);
+            osc2.type = 'sine';
+            gain2.gain.setValueAtTime(0.1, audioContext.currentTime + 0.15);
+            gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+            osc2.start(audioContext.currentTime + 0.15);
+            osc2.stop(audioContext.currentTime + 0.5);
+        }
+
+        function playCollisionSound() {
+            if (!soundEnabled || !audioContext) return;
+
+            // Create noise for crash sound
+            const bufferSize = audioContext.sampleRate * 0.3;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.1));
+            }
+
+            const noise = audioContext.createBufferSource();
+            noise.buffer = buffer;
+
+            const gainNode = audioContext.createGain();
+            const filter = audioContext.createBiquadFilter();
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(1000, audioContext.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.3);
+
+            noise.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+            noise.start(audioContext.currentTime);
+
+            // Low thud
+            const osc = audioContext.createOscillator();
+            const oscGain = audioContext.createGain();
+            osc.connect(oscGain);
+            oscGain.connect(audioContext.destination);
+
+            osc.frequency.setValueAtTime(150, audioContext.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.2);
+            osc.type = 'sine';
+
+            oscGain.gain.setValueAtTime(0.3, audioContext.currentTime);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+            osc.start(audioContext.currentTime);
+            osc.stop(audioContext.currentTime + 0.2);
+        }
+
+        function playStartSound() {
+            if (!soundEnabled || !audioContext) return;
+
+            const notes = [392, 440, 494, 523, 587, 659]; // G4 to E5
+
+            notes.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc.frequency.setValueAtTime(freq, audioContext.currentTime + i * 0.08);
+                osc.type = 'triangle';
+
+                gain.gain.setValueAtTime(0, audioContext.currentTime + i * 0.08);
+                gain.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + i * 0.08 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + i * 0.08 + 0.15);
+
+                osc.start(audioContext.currentTime + i * 0.08);
+                osc.stop(audioContext.currentTime + i * 0.08 + 0.15);
+            });
+        }
+
+        // Sound toggle
+        soundToggle.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundToggle.textContent = soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+        });
+
+        // High Score Storage Functions
+        const HIGH_SCORE_KEY = 'flappyHorusHighScore';
+
+        function loadHighScore() {
+            try {
+                const saved = localStorage.getItem(HIGH_SCORE_KEY);
+                return saved ? parseInt(saved, 10) : 0;
+            } catch (e) {
+                console.log('Could not load high score:', e);
+                return 0;
+            }
+        }
+
+        function saveHighScore(newScore) {
+            try {
+                const current = loadHighScore();
+                if (newScore > current) {
+                    localStorage.setItem(HIGH_SCORE_KEY, newScore.toString());
+                    return true; // New high score!
+                }
+                return false;
+            } catch (e) {
+                console.log('Could not save high score:', e);
+                return false;
+            }
+        }
+
+        // Game state
+        let gameRunning = false;
+        let gameOver = false;
+        let score = 0;
+        let bestScore = loadHighScore(); // Load from storage on init
+        let frameCount = 0;
+
+        // Update display with loaded high score
+        bestScoreDisplay.textContent = bestScore;
+
+        // Bird (Classic Flappy style - smaller and cuter)
+        const bird = {
+            x: 80,
+            y: 300,
+            width: 34,
+            height: 24,
+            velocity: 0,
+            gravity: 0.4,
+            jump: -7.5,
+            rotation: 0,
+            wingPhase: 0
+        };
+
+        // Use our custom drawn bird (no external sprite)
+
+        // Pillars (Obelisks) - EASIER: wider gap, slower speed, thinner pillars
+        let pillars = [];
+        const pillarWidth = 60;
+        const pillarGap = 220;
+        const pillarSpeed = 2.2;
+
+        // Particles for feather effect
+        let particles = [];
+
+        // Draw gradient sky with stars
+        function drawBackground() {
+            // Sky gradient (night desert)
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#0a0a20');
+            gradient.addColorStop(0.4, '#1a1a40');
+            gradient.addColorStop(0.7, '#2d1f3d');
+            gradient.addColorStop(1, '#4a3030');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Stars
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 73 + frameCount * 0.1) % canvas.width;
+                const y = (i * 37) % (canvas.height * 0.6);
+                const size = (i % 3) + 1;
+                ctx.globalAlpha = 0.3 + (Math.sin(frameCount * 0.02 + i) + 1) * 0.35;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            // Moon
+            ctx.fillStyle = '#fffacd';
+            ctx.beginPath();
+            ctx.arc(350, 80, 30, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#0a0a20';
+            ctx.beginPath();
+            ctx.arc(340, 75, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Distant pyramids silhouette
+            ctx.fillStyle = '#1a1520';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - 100);
+            ctx.lineTo(80, canvas.height - 180);
+            ctx.lineTo(160, canvas.height - 100);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(100, canvas.height - 100);
+            ctx.lineTo(200, canvas.height - 220);
+            ctx.lineTo(300, canvas.height - 100);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(280, canvas.height - 100);
+            ctx.lineTo(350, canvas.height - 160);
+            ctx.lineTo(420, canvas.height - 100);
+            ctx.fill();
+
+            // Sand dunes (ground)
+            const sandGradient = ctx.createLinearGradient(0, canvas.height - 100, 0, canvas.height);
+            sandGradient.addColorStop(0, '#c9a86c');
+            sandGradient.addColorStop(1, '#a08050');
+            ctx.fillStyle = sandGradient;
+            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+
+            // Sand wave pattern
+            ctx.strokeStyle = '#b8956e';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                for (let x = 0; x <= canvas.width; x += 10) {
+                    const y = canvas.height - 90 + i * 25 + Math.sin((x + frameCount * 0.5) * 0.05) * 5;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // Draw obelisk pillar
+        function drawPillar(x, topHeight, isTop) {
+            const y = isTop ? 0 : topHeight + pillarGap;
+            const height = isTop ? topHeight : canvas.height - y;
+
+            // Main pillar body
+            const pillarGradient = ctx.createLinearGradient(x, 0, x + pillarWidth, 0);
+            pillarGradient.addColorStop(0, '#a08060');
+            pillarGradient.addColorStop(0.3, '#c9a86c');
+            pillarGradient.addColorStop(0.7, '#b8956e');
+            pillarGradient.addColorStop(1, '#8b7355');
+            ctx.fillStyle = pillarGradient;
+            ctx.fillRect(x, y, pillarWidth, height);
+
+            // Hieroglyph decorations
+            ctx.fillStyle = '#6b5344';
+            const startY = isTop ? y + 30 : y + 20;
+            const endY = isTop ? y + height - 10 : Math.min(y + height - 10, canvas.height - 110);
+
+            for (let gy = startY; gy < endY; gy += 35) {
+                // Eye of Horus pattern
+                ctx.beginPath();
+                ctx.arc(x + pillarWidth/2, gy, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Ankh symbol
+                if (gy + 25 < endY) {
+                    ctx.beginPath();
+                    ctx.arc(x + pillarWidth/2, gy + 20, 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.fillRect(x + pillarWidth/2 - 2, gy + 25, 4, 12);
+                    ctx.fillRect(x + pillarWidth/2 - 8, gy + 30, 16, 3);
+                }
+            }
+
+            // Golden cap/base
+            ctx.fillStyle = '#ffd700';
+            if (isTop) {
+                // Pyramid cap at bottom of top pillar
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y + height);
+                ctx.lineTo(x + pillarWidth/2, y + height + 20);
+                ctx.lineTo(x + pillarWidth + 5, y + height);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#c9a227';
+                ctx.beginPath();
+                ctx.moveTo(x + pillarWidth/2, y + height + 20);
+                ctx.lineTo(x + pillarWidth + 5, y + height);
+                ctx.lineTo(x + pillarWidth/2, y + height);
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // Pyramid cap at top of bottom pillar
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y);
+                ctx.lineTo(x + pillarWidth/2, y - 20);
+                ctx.lineTo(x + pillarWidth + 5, y);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#c9a227';
+                ctx.beginPath();
+                ctx.moveTo(x + pillarWidth/2, y - 20);
+                ctx.lineTo(x + pillarWidth + 5, y);
+                ctx.lineTo(x + pillarWidth/2, y);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Border lines
+            ctx.strokeStyle = '#5c4a3a';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, pillarWidth, height);
+        }
+
+        // Draw the Bird with Egyptian accessories
+        function drawBird() {
+            ctx.save();
+            ctx.translate(bird.x + bird.width/2, bird.y + bird.height/2);
+
+            // Rotation based on velocity
+            bird.rotation = Math.min(Math.max(bird.velocity * 4, -25), 70);
+            ctx.rotate(bird.rotation * Math.PI / 180);
+
+            // Wing flap animation
+            bird.wingPhase += gameRunning && !gameOver ? 0.35 : 0.12;
+            const wingY = Math.sin(bird.wingPhase) * 3;
+
+            // Cute yellow flappy bird
+            // Body (yellow with gradient)
+            const bodyGrad = ctx.createRadialGradient(0, wingY, 0, 0, wingY, bird.width/2);
+            bodyGrad.addColorStop(0, '#ffeb3b');
+            bodyGrad.addColorStop(1, '#f7dc6f');
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, wingY, bird.width/2, bird.height/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Body outline
+            ctx.strokeStyle = '#d4ac0d';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Wing (animated)
+            ctx.fillStyle = '#f4d03f';
+            ctx.beginPath();
+            ctx.ellipse(-5, 2 + wingY + Math.sin(bird.wingPhase) * 5, 9, 6, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#d4ac0d';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+
+            // Eye white
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(8, -3 + wingY, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye outline
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+
+            // Eye pupil
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(10, -3 + wingY, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye shine
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(11, -5 + wingY, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Beak (orange/red)
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.moveTo(14, -1 + wingY);
+            ctx.lineTo(24, 3 + wingY);
+            ctx.lineTo(14, 6 + wingY);
+            ctx.closePath();
+            ctx.fill();
+
+            // Beak highlight
+            ctx.fillStyle = '#ff6b6b';
+            ctx.beginPath();
+            ctx.moveTo(14, -1 + wingY);
+            ctx.lineTo(20, 1 + wingY);
+            ctx.lineTo(14, 3 + wingY);
+            ctx.closePath();
+            ctx.fill();
+
+            // === EGYPTIAN ACCESSORIES ===
+
+            // Pharaoh Nemes headdress (blue and gold striped)
+            ctx.fillStyle = '#1e3a8a';
+            ctx.beginPath();
+            ctx.moveTo(-12, -8 + wingY);
+            ctx.lineTo(-8, -18 + wingY);
+            ctx.lineTo(4, -18 + wingY);
+            ctx.lineTo(8, -8 + wingY);
+            ctx.closePath();
+            ctx.fill();
+
+            // Gold stripes on headdress
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-10, -10 + wingY);
+            ctx.lineTo(-6, -16 + wingY);
+            ctx.moveTo(-6, -10 + wingY);
+            ctx.lineTo(-3, -16 + wingY);
+            ctx.moveTo(-2, -10 + wingY);
+            ctx.lineTo(0, -16 + wingY);
+            ctx.moveTo(2, -10 + wingY);
+            ctx.lineTo(3, -16 + wingY);
+            ctx.moveTo(6, -10 + wingY);
+            ctx.lineTo(6, -16 + wingY);
+            ctx.stroke();
+
+            // Golden cobra (Uraeus) on forehead
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.moveTo(-2, -18 + wingY);
+            ctx.quadraticCurveTo(0, -26 + wingY, 2, -22 + wingY);
+            ctx.quadraticCurveTo(0, -20 + wingY, -2, -18 + wingY);
+            ctx.fill();
+
+            // Cobra head
+            ctx.beginPath();
+            ctx.ellipse(0, -25 + wingY, 3, 2.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cobra eyes
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(-1, -25 + wingY, 0.8, 0, Math.PI * 2);
+            ctx.arc(1, -25 + wingY, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Golden ankh necklace
+            ctx.fillStyle = '#ffd700';
+            ctx.strokeStyle = '#c9a227';
+            ctx.lineWidth = 1.5;
+
+            // Ankh loop
+            ctx.beginPath();
+            ctx.ellipse(0, 10 + wingY, 4, 3, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Ankh stem
+            ctx.fillRect(-1.5, 13 + wingY, 3, 8);
+
+            // Ankh arms
+            ctx.fillRect(-5, 14 + wingY, 10, 2.5);
+
+            ctx.restore();
+
+            // Golden sparkle trail
+            if (gameRunning && !gameOver && Math.random() > 0.75) {
+                particles.push({
+                    x: bird.x,
+                    y: bird.y + bird.height/2 + Math.random() * 6 - 3,
+                    vx: -1.5 + Math.random() * -1,
+                    vy: (Math.random() - 0.5) * 1.5,
+                    life: 25,
+                    rotation: Math.random() * Math.PI * 2,
+                    rotSpeed: (Math.random() - 0.5) * 0.15,
+                    type: Math.random() > 0.6 ? 'sparkle' : 'ankh',
+                    color: '#ffd700'
+                });
+            }
+        }
+
+        // Update and draw particles
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.03; // slight gravity
+                p.life--;
+                p.rotation += p.rotSpeed;
+
+                ctx.globalAlpha = p.life / 25;
+
+                if (p.type === 'ankh') {
+                    // Mini ankh particle
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rotation);
+                    ctx.fillStyle = p.color;
+                    ctx.strokeStyle = p.color;
+                    ctx.lineWidth = 1;
+                    // Ankh loop
+                    ctx.beginPath();
+                    ctx.arc(0, -2, 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                    // Ankh stem
+                    ctx.fillRect(-0.5, 0, 1, 4);
+                    // Ankh arms
+                    ctx.fillRect(-2, 1, 4, 1);
+                    ctx.restore();
+                } else {
+                    // Sparkle
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Add glow
+                    ctx.globalAlpha = p.life / 50;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        // Draw game over screen
+        function drawGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Sarcophagus design - made larger to fit content
+            ctx.fillStyle = '#c9a227';
+            ctx.fillRect(canvas.width/2 - 130, canvas.height/2 - 100, 260, 200);
+
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(canvas.width/2 - 120, canvas.height/2 - 90, 240, 180);
+
+            // Ankh symbols - positioned at top corners of the panel
+            ctx.fillStyle = '#8b6914';
+            ctx.font = '24px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('☥', canvas.width/2 - 95, canvas.height/2 - 65);
+            ctx.fillText('☥', canvas.width/2 + 95, canvas.height/2 - 65);
+
+            ctx.fillStyle = '#1e3a8a';
+            ctx.font = 'bold 28px Papyrus, fantasy';
+            ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2 - 40);
+
+            ctx.fillStyle = '#c9a227';
+            ctx.font = '22px Papyrus, fantasy';
+            ctx.fillText(`Score: ${score}`, canvas.width/2, canvas.height/2 + 5);
+            ctx.fillText(`Best: ${bestScore}`, canvas.width/2, canvas.height/2 + 35);
+
+            ctx.fillStyle = '#4a3030';
+            ctx.font = '16px Papyrus, fantasy';
+            ctx.fillText('Click to Play Again', canvas.width/2, canvas.height/2 + 70);
+        }
+
+        // Draw start screen
+        function drawStartScreen() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 32px Papyrus, fantasy';
+            ctx.textAlign = 'center';
+            ctx.fillText('FLAPPY HORUS', canvas.width/2, canvas.height/2 - 60);
+
+            ctx.font = '20px Papyrus, fantasy';
+            ctx.fillStyle = '#d4af37';
+            ctx.fillText('Guide the Sacred Falcon', canvas.width/2, canvas.height/2 - 20);
+            ctx.fillText('through the Obelisks!', canvas.width/2, canvas.height/2 + 10);
+
+            ctx.fillStyle = '#ffd700';
+            ctx.font = '24px Papyrus, fantasy';
+            ctx.fillText('Click to Start', canvas.width/2, canvas.height/2 + 60);
+
+            // Decorative hieroglyphs
+            ctx.font = '30px serif';
+            ctx.fillText('𓂀 𓅃 𓃭 𓆣', canvas.width/2, canvas.height/2 + 110);
+        }
+
+        // Create new pillar
+        function createPillar() {
+            const minHeight = 80;
+            const maxHeight = canvas.height - pillarGap - minHeight - 100;
+            const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+
+            pillars.push({
+                x: canvas.width,
+                topHeight: topHeight,
+                passed: false
+            });
+        }
+
+        // Check collision - more forgiving hitbox for smaller bird
+        function checkCollision() {
+            // Ground and ceiling
+            if (bird.y + bird.height > canvas.height - 100 || bird.y < -10) {
+                return true;
+            }
+
+            // Pillars - generous hitbox (smaller than visual)
+            for (const pillar of pillars) {
+                const birdRight = bird.x + bird.width - 8;
+                const birdLeft = bird.x + 8;
+                const birdTop = bird.y + 6;
+                const birdBottom = bird.y + bird.height - 6;
+
+                const pillarLeft = pillar.x + 5;
+                const pillarRight = pillar.x + pillarWidth - 5;
+                const gapTop = pillar.topHeight + 25; // More forgiving gap
+                const gapBottom = pillar.topHeight + pillarGap - 25;
+
+                if (birdRight > pillarLeft && birdLeft < pillarRight) {
+                    if (birdTop < gapTop || birdBottom > gapBottom) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // Update game state
+        function update() {
+            if (!gameRunning || gameOver) return;
+
+            frameCount++;
+
+            // Bird physics
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+
+            // Update pillars
+            for (let i = pillars.length - 1; i >= 0; i--) {
+                pillars[i].x -= pillarSpeed;
+
+                // Score
+                if (!pillars[i].passed && pillars[i].x + pillarWidth < bird.x) {
+                    pillars[i].passed = true;
+                    score++;
+                    scoreDisplay.textContent = score;
+                    playScoreSound();
+                }
+
+                // Remove off-screen pillars
+                if (pillars[i].x + pillarWidth < 0) {
+                    pillars.splice(i, 1);
+                }
+            }
+
+            // Create new pillars
+            if (pillars.length === 0 || pillars[pillars.length - 1].x < canvas.width - 250) {
+                createPillar();
+            }
+
+            // Check collision
+            if (checkCollision()) {
+                gameOver = true;
+                playCollisionSound();
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestScoreDisplay.textContent = bestScore;
+                    saveHighScore(bestScore); // Save to localStorage
+                }
+            }
+        }
+
+        // Draw everything
+        function draw() {
+            drawBackground();
+
+            // Draw pillars
+            for (const pillar of pillars) {
+                drawPillar(pillar.x, pillar.topHeight, true);
+                drawPillar(pillar.x, pillar.topHeight, false);
+            }
+
+            updateParticles();
+            drawBird();
+
+            if (gameOver) {
+                drawGameOver();
+            } else if (!gameRunning) {
+                drawStartScreen();
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Jump
+        function jump() {
+            initAudio(); // Initialize audio on first interaction
+
+            if (gameOver) {
+                // Reset game
+                bird.y = 300;
+                bird.velocity = 0;
+                pillars = [];
+                particles = [];
+                score = 0;
+                scoreDisplay.textContent = 0;
+                gameOver = false;
+                gameRunning = true;
+                playStartSound();
+            } else if (!gameRunning) {
+                gameRunning = true;
+                playStartSound();
+            }
+
+            if (gameRunning && !gameOver) {
+                bird.velocity = bird.jump;
+                playFlapSound();
+            }
+        }
+
+        // Event listeners
+        canvas.addEventListener('click', jump);
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                jump();
+            }
+        });
+
+        // Start the game loop
+        gameLoop();
+    </script>
+</body>
+</html>
