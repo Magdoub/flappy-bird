@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Flappy Horus - Egyptian Flappy Bird</title>
     <style>
         * {
@@ -16,9 +16,11 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            min-height: 100dvh;
             background: linear-gradient(135deg, #1a0a00 0%, #3d2314 100%);
             font-family: 'Papyrus', 'Copperplate', fantasy;
             overflow: hidden;
+            padding: 10px;
         }
 
         .game-container {
@@ -26,41 +28,56 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 10px;
+            max-width: 100%;
+            max-height: 100vh;
+            max-height: 100dvh;
         }
 
         h1 {
             color: #ffd700;
             text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 20px #ff8c00;
-            font-size: 2.5rem;
-            letter-spacing: 3px;
+            font-size: clamp(1.2rem, 5vw, 2.5rem);
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 2/3;
         }
 
         #gameCanvas {
-            border: 8px solid #c9a227;
+            width: 100%;
+            height: 100%;
+            border: 4px solid #c9a227;
             border-radius: 10px;
             box-shadow: 0 0 30px rgba(201, 162, 39, 0.5), inset 0 0 50px rgba(0,0,0,0.3);
             cursor: pointer;
+            touch-action: manipulation;
         }
 
         .score-display {
             display: flex;
-            gap: 40px;
+            gap: 20px;
             color: #ffd700;
-            font-size: 1.3rem;
+            font-size: clamp(0.9rem, 3vw, 1.3rem);
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
 
         .instructions {
             color: #d4af37;
-            font-size: 1rem;
+            font-size: clamp(0.75rem, 2.5vw, 1rem);
             text-align: center;
             opacity: 0.9;
         }
 
         .controls {
             display: flex;
-            gap: 20px;
+            flex-direction: column;
+            gap: 8px;
             align-items: center;
         }
 
@@ -72,8 +89,9 @@
             border-radius: 8px;
             cursor: pointer;
             font-family: inherit;
-            font-size: 0.9rem;
+            font-size: clamp(0.8rem, 2.5vw, 0.9rem);
             transition: all 0.2s;
+            touch-action: manipulation;
         }
 
         .sound-toggle:hover {
@@ -81,15 +99,138 @@
             transform: scale(1.05);
         }
 
+        .sound-toggle:active {
+            transform: scale(0.98);
+        }
+
         .hieroglyph-border {
             position: absolute;
             font-size: 2rem;
             color: #8b6914;
             opacity: 0.3;
+            display: none;
         }
 
         .hieroglyph-border.left { left: -50px; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; }
         .hieroglyph-border.right { right: -50px; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; }
+
+        /* Mobile tap button overlay */
+        .mobile-tap-zone {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(145deg, #c9a227, #8b6914);
+            border: 3px solid #ffd700;
+            color: #fff;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 15px rgba(201, 162, 39, 0.5);
+            z-index: 100;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        .mobile-tap-zone:active {
+            transform: translateX(-50%) scale(0.95);
+            background: linear-gradient(145deg, #ffd700, #c9a227);
+        }
+
+        /* Desktop styles */
+        @media (min-width: 500px) and (min-height: 700px) {
+            body {
+                padding: 20px;
+            }
+
+            .game-container {
+                gap: 15px;
+            }
+
+            #gameCanvas {
+                border-width: 8px;
+            }
+
+            .score-display {
+                gap: 40px;
+            }
+
+            .hieroglyph-border {
+                display: block;
+            }
+        }
+
+        /* Mobile landscape */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .game-container {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+            }
+
+            h1 {
+                width: 100%;
+                font-size: 1rem;
+            }
+
+            .canvas-wrapper {
+                max-height: 80vh;
+                max-height: 80dvh;
+                width: auto;
+                aspect-ratio: 2/3;
+            }
+
+            .score-display {
+                position: absolute;
+                top: 5px;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+
+            .controls {
+                flex-direction: column;
+                justify-content: center;
+            }
+        }
+
+        /* Touch device detection - show tap button */
+        @media (hover: none) and (pointer: coarse) {
+            .mobile-tap-zone {
+                display: block;
+            }
+
+            .instructions {
+                display: none;
+            }
+
+            .game-container {
+                padding-bottom: 80px;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-height: 600px) and (orientation: portrait) {
+            h1 {
+                font-size: 1rem;
+            }
+
+            .score-display {
+                font-size: 0.85rem;
+            }
+
+            .game-container {
+                gap: 5px;
+            }
+
+            .controls {
+                gap: 5px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -99,7 +240,9 @@
             <span>Score: <span id="score">0</span></span>
             <span>Best: <span id="bestScore">0</span></span>
         </div>
-        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="400" height="600"></canvas>
+        </div>
         <div class="controls">
             <p class="instructions">Click or Press SPACE to flap your wings!</p>
             <button class="sound-toggle" id="soundToggle">🔊 Sound: ON</button>
@@ -107,6 +250,7 @@
         <div class="hieroglyph-border left">𓀀𓁀𓂀𓃀𓄀𓅀𓆀𓇀𓈀𓉀</div>
         <div class="hieroglyph-border right">𓊀𓋀𓌀𓍀𓎀𓏀𓐀𓑀𓒀𓓀</div>
     </div>
+    <button class="mobile-tap-zone" id="mobileFlap">TAP TO FLAP</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -882,12 +1026,38 @@
 
         // Event listeners
         canvas.addEventListener('click', jump);
+
+        // Touch support for canvas
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            jump();
+        }, { passive: false });
+
+        // Mobile tap button
+        const mobileFlap = document.getElementById('mobileFlap');
+        mobileFlap.addEventListener('click', (e) => {
+            e.preventDefault();
+            jump();
+        });
+        mobileFlap.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            jump();
+        }, { passive: false });
+
+        // Keyboard support
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
                 e.preventDefault();
                 jump();
             }
         });
+
+        // Prevent unwanted scroll/zoom on mobile
+        document.addEventListener('touchmove', (e) => {
+            if (e.target === canvas || e.target === mobileFlap) {
+                e.preventDefault();
+            }
+        }, { passive: false });
 
         // Start the game loop
         gameLoop();
